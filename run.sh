@@ -1,1 +1,1 @@
-javac -Xlint:unchecked Interpreter.java ; java Interpreter
+javac -Xlint:unchecked -Xdiags:verbose Interpreter.java ; java Interpreter

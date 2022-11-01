@@ -1,11 +1,24 @@
 import java.lang.*;
 import java.util.*;
 import java.io.*;
+import java.math.*;
 
 public class Interpreter{
 	public static String BASE_PROMPT = "amari $ ";
 	public static String ERROR_ADD = "error $ ";
 	public static HashMap<String, Object> userDefined = new HashMap<>();
+
+	public static Set<String> BASIC_MATH_OPERATIONS = Set.of("+", "-", "*", "/");
+
+	public static boolean isNumeric(String s){
+		try{
+			Double d = Double.parseDouble(s);
+			return true;
+		}
+		catch (Exception e){
+			return false;
+		}
+	}
 
 	public static ndArrayBase declareNewArray(String[] splitString){
 		String arrayName = splitString[1];
@@ -58,10 +71,39 @@ public class Interpreter{
 		//in general, this command should be formatted as such:
 		//arr <arrayname> <keyword> <arraytwo>
 		//for instance:
-		//arr myArray1 add myArray2
+		//arr myArray1 + myArray2
 
-		if (splitString[2].equals("+")){
+		String op = splitString[2];
+
+		if (BASIC_MATH_OPERATIONS.contains(op)){
+			//we want to push numeric values
+			//that is, non-array values
+			//to the end of our expression
+			//so that we can process everything
+			//in the format <array + number>
+			//or even just the regular <array + array>
+
+			if (isNumeric(splitString[1])){
+				//here, we get the first two arguments
+				//which will basically be something like
+				//"arr someNumber"
+				//and then we get the right side of the expression
+				//and then we switch the first and right hand sides
+				String base = splitString[0];
+				String first = splitString[1];
+				String[] right_hand_side = Arrays.copyOfRange(splitString, 3, splitString.length);
+				String[] modifiedInput = new String[splitString.length];
+				modifiedInput[0] = base;
+				for (int i = 0; i < right_hand_side.length; i++){
+					modifiedInput[i + 1] = right_hand_side[i];
+				}
+				modifiedInput[splitString.length - 2] = op;
+				modifiedInput[splitString.length - 1] = first;
+				splitString = modifiedInput;
+			}
+
 			ndArrayBase arr1 = (ndArrayBase) userDefined.get(splitString[1]);
+
 
 			//we can also have a command that looks like this:
 			//arr myArray1 add arr myArray2 add myArray3
@@ -76,7 +118,14 @@ public class Interpreter{
 				secondArgArray[i] = splitString[i + 3];
 			}
 			String secondArg = String.join(" ", secondArgArray);
-			return arr1.mathAdd((ndArrayBase) parseUserInput(secondArg, false));
+			Object parsedSecondArg = parseUserInput(secondArg, false);
+			if (parsedSecondArg instanceof ndArrayBase){
+				ndArrayBase arr2 = (ndArrayBase) parsedSecondArg;
+				return arr1.mathOperation(arr2, op);
+			}
+			else{
+				return null;
+			}
 		}
 		else{
 			ndArrayBase array = declareNewArray(splitString);
@@ -88,6 +137,9 @@ public class Interpreter{
 		if (o instanceof ndArrayBase){
 			ndArrayBase arr = (ndArrayBase) o;
 			arr.printSelf();
+		}
+		else{
+			System.out.println(o);
 		}
 	}
 
@@ -113,11 +165,21 @@ public class Interpreter{
 		//get the base command
 		String baseCommand = splitString[0];
 
+		//check if input is numeric type
+		if (splitString.length == 1 && isNumeric(baseCommand)){
+			int[] shape = {1};
+			ArrayList<Comparable> data = new ArrayList<Comparable>();
+			data.add(new BigDecimal(baseCommand));
+			return new ndArrayBase(data, shape);
+		}
 
 		//check if user is creating a new array
 		if (baseCommand.equals("arr")){
 			ndArrayBase array = arrayCommand(splitString);
 			return array;
+		}
+		else if (baseCommand.equals("ma")){
+			return null;
 		}
 		else if (baseCommand.equals("exit")){
 			System.exit(0);
@@ -139,7 +201,7 @@ public class Interpreter{
 			return userDefined.get(splitString[0]);
 		}
 		else{
-			//here we see if the user's input is actualy a
+			//here we see if the user's input is actually a
 			//defined variable
 			if (mainThread){
 				printUserVariable(baseCommand);
@@ -160,7 +222,9 @@ public class Interpreter{
 				System.out.print(BASE_PROMPT);
 				String userInput = scan.nextLine();
 				Object output = parseUserInput(userInput, true);
-				printObject(output);
+				if (output != null){
+					printObject(output);
+				}
 			}
 			catch (Exception e){
 				e.printStackTrace();
